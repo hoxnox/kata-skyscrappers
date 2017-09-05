@@ -7,4 +7,5 @@ conan_basic_setup()
 
 add_executable(testapp test.cpp)
 target_link_libraries(testapp ${CONAN_LIBS})
+set_property(TARGET testapp PROPERTY CXX_STANDARD 11)
 
