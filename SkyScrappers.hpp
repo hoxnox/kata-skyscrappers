@@ -365,13 +365,13 @@ SkyScrappers<N>::Solve(const int* clues)
     {
         auto clue1 = clue1_ - clues;
         if (clue1 < N)
-            matrix[0][clue1] = 7;
+            matrix[0][clue1] = N;
         if (clue1 > N && clue1 < 2*N)
-            matrix[clue1%N][N-1] = 7;
+            matrix[clue1%N][N-1] = N;
         if (clue1 > 2*N && clue1 < 3*N)
-            matrix[N-1][N-1-clue1%N] = 7;
+            matrix[N-1][N-1-clue1%N] = N;
         if (clue1 > 3*N && clue1 < 4*N)
-            matrix[N-1-clue1%N][0] = 7;
+            matrix[N-1-clue1%N][0] = N;
     }
 
 
