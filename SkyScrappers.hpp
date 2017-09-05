@@ -276,10 +276,11 @@ SkyScrappers<N>::fill(Matrix matrix, std::array<uint8_t, N> line, int idx)
                 }
                 return true;
             };
+    uint8_t ln_i = 0;
     if (!wheel(matrix, idx, 
-            [&line](Matrix& m, uint8_t i, uint8_t j, bool is_vertical) -> bool
+            [&line, &ln_i](Matrix& m, uint8_t i, uint8_t j, bool is_vertical) -> bool
             {
-                uint8_t& lv = is_vertical ? line[i] : line[j];
+                uint8_t& lv = line[ln_i];
                 if (m[i][j] != 0 && m[i][j] != lv)
                     return false;
                 for (uint8_t k = 0; k < N; ++k)
@@ -289,6 +290,7 @@ SkyScrappers<N>::fill(Matrix matrix, std::array<uint8_t, N> line, int idx)
                         return false;
                 }
                 m[i][j] = lv;
+                ++ln_i;
                 return true;
             }))
     {
