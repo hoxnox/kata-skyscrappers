@@ -248,16 +248,52 @@ template<uint8_t N>
 typename SkyScrappers<N>::Matrix
 SkyScrappers<N>::fill(Matrix matrix, std::array<uint8_t, N> line, int idx)
 {
-    auto ln = getLine(matrix, idx);
-    for (int i = 0; i < N; ++i)
+    auto wheel = [](Matrix& m, int idx, std::function<bool(Matrix&, uint8_t, uint8_t, bool)> f) -> bool
+            {
+                if (0 <= idx && idx < N)
+                {
+                    for (uint8_t i = 0; i < N; ++i)
+                        if (!f(m, i, idx%N, true))
+                            return false;
+                }
+                else if (N-1 < idx && idx < 2*N)
+                {
+                    for (int i = 0; i < N; ++i)
+                        if (!f(m, idx%N, N-1-i, false))
+                            return false;
+                }
+                else if (2*N-1 < idx && idx < 3*N)
+                {
+                    for (int i = 0; i < N; ++i)
+                        if (!f(m, N-1-i, 3*N-1-idx, true))
+                            return false;
+                }
+                else if (3*N-1 < idx && idx < 4*N)
+                {
+                    for (int i = 0; i < N; ++i)
+                        if (!f(m, 4*N-1-idx, i, false))
+                            return false;
+                }
+                return true;
+            };
+    if (!wheel(matrix, idx, 
+            [&line](Matrix& m, uint8_t i, uint8_t j, bool is_vertical) -> bool
+            {
+                uint8_t& lv = is_vertical ? line[i] : line[j];
+                if (m[i][j] != 0 && m[i][j] != lv)
+                    return false;
+                for (uint8_t k = 0; k < N; ++k)
+                {
+                    if ( (is_vertical && k != j && m[i][k] == lv)
+                     || (!is_vertical && k != i && m[k][j] == lv))
+                        return false;
+                }
+                m[i][j] = lv;
+                return true;
+            }))
     {
-        if (*ln[i] == 0)
-            *ln[i] = line[i];
-        else if (*ln[i] != line[i])
-            return {};
-    }
-    if (!is_valid_row(matrix, idx))
         return {};
+    }
     return matrix;
 }
 
