@@ -4,6 +4,7 @@
  * https://github.com/hoxnox/skyscrappers*/
 
 #include <vector>
+#include <list>
 #include <array>
 #include <algorithm>
 #include <cstring>
@@ -297,7 +298,6 @@ SkyScrappers<N>::generate(std::array<uint8_t, N*4> clues, int i,
                 rs.emplace_back(matrix);
         }
     }
-    LOG(INFO) << "generated " << (int)i << ": " << rs.size() << std::endl;
     return rs;
 }
 
@@ -349,6 +349,8 @@ SkyScrappers<N>::Solve(const int* clues)
     for (uint8_t i = 0; i < N*4; ++i)
         clues_[i] = static_cast<uint8_t>(clues[i]);
 
+    uint8_t best_prev = 0;
+
     // The line for clue = N is determined, we should fill it
     auto clueN = std::find(clues, clues + 4*N, N);
     if (clueN != clues + 4*N)
@@ -357,6 +359,7 @@ SkyScrappers<N>::Solve(const int* clues)
         for (uint8_t i = 0; i < N; ++i)
             line[i] = i + 1;
         matrix = fill(matrix, line, clueN - clues);
+        best_prev = clueN-clues;
     }
 
     // matrix cell for clue = 1 is determined, we should fill it too
@@ -375,69 +378,58 @@ SkyScrappers<N>::Solve(const int* clues)
     }
 
 
-    auto find = [](std::vector<uint8_t> vec, uint8_t val) -> bool
+    auto find = [](const std::list<uint8_t>& list, uint8_t val) -> std::list<uint8_t>::const_iterator
     {
-        for (uint8_t i = 0; i < vec.size(); ++i)
-            if (val == vec[i])
-                return true;
-        return false;
+        auto i = list.begin();
+        for (; i != list.end(); ++i)
+            if (val == *i)
+                break;
+        return i;
     };
-    std::vector<std::pair<uint8_t, size_t>> perm_count;
-    std::vector<uint8_t> rskip;
-    for (uint8_t i = 0; i < N*4; ++i)
-    {
-        if (find(rskip, i))
-            continue;
-        if (clues[i] == 0 || clues[i] == N)
-            continue;
-        if (!permutations_[clues[i]])
-            return nullptr;
-        if (clues[ridx(i)] != 0)
-        {
-            rskip.emplace_back(ridx(i));
-            size_t count = 0;
-            for (const auto& perm : *permutations_[clues[i]])
-                if (perm.rev_vision == clues[ridx(i)])
-                    ++count;
-            perm_count.emplace_back(i, count);
-        }
-        else
-        {
-            perm_count.emplace_back(i, permutations_[clues[i]]->size());
-        }
-    }
-    std::sort(perm_count.begin(), perm_count.end(),
-              [](const std::pair<uint8_t, size_t>& lhv, const std::pair<uint8_t, size_t>& rhv)
-              {
-                  return lhv.second < rhv.second;
-              });
+    std::list<uint8_t> pending;
+    for (uint8_t i = 0; i < clues_.size(); ++i)
+        if (clues_[i] != 0 && clues_[i] != N)
+            pending.emplace_back(i);
 
-    std::vector<uint8_t> vert;
-    std::vector<uint8_t> horz;
-    for (const auto& perm : perm_count)
-    {
-        if ((perm.first/N)%2 == 1)
-            horz.emplace_back(perm.first);
-        else
-            vert.emplace_back(perm.first);
-    }
-
-    auto vert_i = vert.begin();
-    auto horz_i = horz.begin();
-    std::vector<uint8_t> gen_order(perm_count.size());
-    for (uint8_t i = 0; i < gen_order.size(); ++i)
-    {
-        if ((i%2 == 0 && vert_i != vert.end()) || horz_i == horz.end())
-        {
-            gen_order[i] = *vert_i++;
-            continue;
-        }
-        gen_order[i] = *horz_i++;
-    }
-
+    
     std::vector<Matrix> candidates{matrix};
-    for (const auto& i : gen_order)
-            candidates = generate(clues_, i, candidates);
+    while (!pending.empty())
+    {
+        if (best_prev != 0)
+            pending.sort([best_prev](const uint8_t& lhv, const uint8_t& rhv) { return (lhv/N%2) != (best_prev/N%2); });
+        auto best_pending = pending.begin();
+        std::vector<Matrix> best_candidates;
+        size_t min_sz = std::numeric_limits<size_t>::max();
+        std::list<uint8_t> rskip;
+        for(auto cur = pending.begin(); cur != pending.end(); ++cur)
+        {
+            if (find(rskip, *cur) != rskip.end())
+                continue;
+
+            auto tmp = generate(clues_, *cur, candidates);
+            LOG(INFO) << "   check " << (int)*cur << ": " << tmp.size() << std::endl;
+            if (clues_[ridx(*cur)] != 0)
+                rskip.emplace_back(ridx(*cur));
+            if (tmp.size() < min_sz && tmp.size() > 0)
+            {
+                best_candidates = tmp;
+                min_sz = tmp.size();
+                best_pending = cur;
+                best_prev = *cur;
+                if (min_sz <= candidates.size()*4)
+                    break;
+            }
+        }
+        candidates = best_candidates;
+        LOG(INFO) << "generated " << (int)*best_pending << "(" << (int)clues_[*best_pending] << "): " << candidates.size() << std::endl;
+        pending.erase(best_pending);
+        if (clues_[ridx(best_prev)] != 0)
+        {
+            auto tmp = find(pending, ridx(best_prev));
+            if (tmp != pending.end())
+                pending.erase(tmp);
+        }
+    }
 
     if (candidates.size() < 1)
         return nullptr;
@@ -471,6 +463,4 @@ SkyScrappers<N>::Solve(const int* clues)
     }
 
     return nullptr;
-};
-
-
+}

@@ -6,6 +6,7 @@ include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
 add_executable(testapp test.cpp)
+add_definitions("-pg")
 target_link_libraries(testapp ${CONAN_LIBS})
 set_property(TARGET testapp PROPERTY CXX_STANDARD 11)
 
