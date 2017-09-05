@@ -1,12 +1,11 @@
-/**@author $username$ <$usermail$>
- * @date $date$
+/**@author hoxnox <hoxnox@gmail.com>
+ * @date 20170905 06:37:16
  *
  * @brief skyscrappers test launcher.*/
 
 // Google Testing Framework
 #include <gtest/gtest.h>
-
-// test cases
+#include "t_SkyScrappers.hpp"
 
 int main(int argc, char *argv[])
 {
