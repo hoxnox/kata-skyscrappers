@@ -45,7 +45,7 @@ private:
         Line line;
         uint8_t rev_vision;
     } Permutation;
-    std::array<std::shared_ptr<std::vector<Permutation>>, N> permutations_{};
+    std::array<std::vector<Permutation>, N> permutations_{};
 
     ///@brief replace matrix line with given line by clue index if it's possible
     static Matrix fill(Matrix matrix, std::array<uint8_t, N> line, int idx);
@@ -200,9 +200,7 @@ SkyScrappers<N>::SkyScrappers()
     while(std::next_permutation(v.begin(), v.end()))
     {
         uint8_t vis = vision(v.begin(), v.end());
-        if (permutations_[vis] == nullptr)
-            permutations_[vis].reset(new std::vector<Permutation>{});
-        permutations_[vis]->emplace_back(v, vision(v.rbegin(), v.rend()));
+        permutations_[vis].emplace_back(v, vision(v.rbegin(), v.rend()));
         //LOG(INFO) << v << " " << (int)permutations_[vis]->back().rev_vision << std::endl;
     }
 }
@@ -248,33 +246,18 @@ SkyScrappers<N>::generate(std::array<uint8_t, N*4> clues, int i,
     if (clues[i] == 0)
         return templates;
 
-    if (!permutations_[clues[i]])
-        return {};
-
     std::vector<Matrix> rs;
-    auto ri = ridx(i);
-    std::vector<Permutation> lines;
-    if (clues[ri] == 0)
-    {
-        lines = *permutations_[clues[i]];
-    }
-    else
-    {
-        std::copy_if(permutations_[clues[i]]->begin(), permutations_[clues[i]]->end(),
-                     std::back_inserter(lines),
-                     [&ri, &clues](const Permutation& permutation)
-                     {
-                         return permutation.rev_vision == clues[ri];
-                     });
-    }
-
+    uint8_t rclue = clues[ridx(i)];
     for (const auto& tpl : templates)
     {
-        for (const auto line: lines)
+        for (const auto& line: permutations_[clues[i]])
         {
-            auto matrix = fill(tpl, line.line, i);
-            if (!matrix.empty())
-                rs.emplace_back(matrix);
+            if (rclue == 0 || line.rev_vision == rclue)
+            {
+                auto matrix = fill(tpl, line.line, i);
+                if (!matrix.empty())
+                    rs.emplace_back(std::move(matrix));
+            }
         }
     }
     return rs;
