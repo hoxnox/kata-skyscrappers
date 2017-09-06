@@ -30,10 +30,6 @@ public:
     using Line = std::array<uint8_t, N>;
     using Matrix = std::vector<Line>;
 
-    ///@brief get mutable matrix line by clue index
-    static std::array<uint8_t*, N> getLine(Matrix& m, int idx);
-    ///@brief check the row at clue idx is valid
-    static bool is_valid_row(Matrix& m, int idx);
     ///@brief get clue counterpart index
     static uint8_t ridx(uint8_t i) { return (N-1 - i%N) + N*(i/N) + (i<N*2 ? 1 : -1)*2*N; }
 
@@ -212,91 +208,29 @@ SkyScrappers<N>::SkyScrappers()
 }
 
 template<uint8_t N>
-std::array<uint8_t*, N>
-SkyScrappers<N>::getLine(Matrix& m, int idx)
-{
-    std::array<uint8_t*, N> rs{};
-    if (0 <= idx && idx < N)
-        for (uint8_t i = 0; i < N; ++i) rs[i] = &m[i][idx%N];
-    else if (N-1 < idx && idx < 2*N)
-        for (int i = 0; i < N; ++i) rs[i] = &m[idx%N][N-1-i];
-    else if (2*N-1 < idx && idx < 3*N)
-        for (int i = 0; i < N; ++i) rs[i] = &m[N-1-i][3*N-1-idx];
-    else if (3*N-1 < idx && idx < 4*N)
-        for (int i = 0; i < N; ++i) rs[i] = &m[4*N-1-idx][i];
-    return rs;
-}
-
-template<uint8_t N>
-bool
-SkyScrappers<N>::is_valid_row(SkyScrappers<N>::Matrix& m, int idx)
-{
-    auto etalon = getLine(m, idx);
-    for (uint8_t i = 0; i < N; ++i)
-    {
-        if (i == idx%N)
-            continue;
-        auto check_line = getLine(m, i + N*(idx/N));
-        for (uint8_t j = 0; j < N; ++j)
-            if (*etalon[j] == *check_line[j])
-                return false;
-    }
-    return true;
-}
-
-template<uint8_t N>
 typename SkyScrappers<N>::Matrix
-SkyScrappers<N>::fill(Matrix matrix, std::array<uint8_t, N> line, int idx)
+SkyScrappers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
 {
-    auto wheel = [](Matrix& m, int idx, std::function<bool(Matrix&, uint8_t, uint8_t, bool)> f) -> bool
-            {
-                if (0 <= idx && idx < N)
-                {
-                    for (uint8_t i = 0; i < N; ++i)
-                        if (!f(m, i, idx%N, true))
-                            return false;
-                }
-                else if (N-1 < idx && idx < 2*N)
-                {
-                    for (int i = 0; i < N; ++i)
-                        if (!f(m, idx%N, N-1-i, false))
-                            return false;
-                }
-                else if (2*N-1 < idx && idx < 3*N)
-                {
-                    for (int i = 0; i < N; ++i)
-                        if (!f(m, N-1-i, 3*N-1-idx, true))
-                            return false;
-                }
-                else if (3*N-1 < idx && idx < 4*N)
-                {
-                    for (int i = 0; i < N; ++i)
-                        if (!f(m, 4*N-1-idx, i, false))
-                            return false;
-                }
-                return true;
-            };
-    uint8_t ln_i = 0;
-    if (!wheel(matrix, idx, 
-            [&line, &ln_i](Matrix& m, uint8_t i, uint8_t j, bool is_vertical) -> bool
-            {
-                uint8_t& lv = line[ln_i];
-                if (m[i][j] != 0 && m[i][j] != lv)
-                    return false;
-                for (uint8_t k = 0; k < N; ++k)
-                {
-                    if ( (is_vertical && k != j && m[i][k] == lv)
-                     || (!is_vertical && k != i && m[k][j] == lv))
-                        return false;
-                }
-                m[i][j] = lv;
-                ++ln_i;
-                return true;
-            }))
+    for (uint8_t k = 0; k < N; ++k)
     {
-        return {};
+        uint8_t i =0, j = 0;
+        if (0 <= idx && idx < N)           { i = k;         j = idx%N;     }
+        else if (N-1 < idx && idx < 2*N)   { i = idx%N;     j = N-1-k;     }
+        else if (2*N-1 < idx && idx < 3*N) { i = N-1-k;     j = 3*N-1-idx; }
+        else if (3*N-1 < idx && idx < 4*N) { i = 4*N-1-idx; j = k;         }
+
+        if (m[i][j] != 0 && m[i][j] != line[k])
+            return {};
+        bool is_vertical = (((idx/N)%2)==0);
+        for (uint8_t n = 0; n < N; ++n)
+        {
+            if ( (is_vertical && n != j && m[i][n] == line[k])
+             || (!is_vertical && n != i && m[n][j] == line[k]))
+                return {};
+        }
+        m[i][j] = line[k];
     }
-    return matrix;
+    return m;
 }
 
 template<uint8_t N>
