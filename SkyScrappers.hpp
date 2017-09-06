@@ -208,27 +208,34 @@ SkyScrappers<N>::SkyScrappers()
 }
 
 template<uint8_t N>
-typename SkyScrappers<N>::Matrix
+inline typename SkyScrappers<N>::Matrix
 SkyScrappers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
 {
-    for (uint8_t k = 0; k < N; ++k)
-    {
-        uint8_t i =0, j = 0;
-        if (0 <= idx && idx < N)           { i = k;         j = idx%N;     }
-        else if (N-1 < idx && idx < 2*N)   { i = idx%N;     j = N-1-k;     }
-        else if (2*N-1 < idx && idx < 3*N) { i = N-1-k;     j = 3*N-1-idx; }
-        else if (3*N-1 < idx && idx < 4*N) { i = 4*N-1-idx; j = k;         }
+    uint8_t fixed = (idx<2*N ? idx%N : N-1-idx%N);
+    uint8_t direction = idx/N;
+    if (direction==1 || direction==2)
+        std::reverse(line.begin(), line.end());
+    bool is_vertical = (direction%2==0);
 
-        if (m[i][j] != 0 && m[i][j] != line[k])
+    for (uint8_t i = 0; i < N; ++i)
+    {
+        uint8_t& v = (is_vertical ? m[i][fixed] : m[fixed][i]);
+        if (v != 0 && v != line[i])
             return {};
-        bool is_vertical = (((idx/N)%2)==0);
-        for (uint8_t n = 0; n < N; ++n)
+        v = line[i];
+    }
+
+    for (uint8_t i = 0; i < N; ++i)
+    {
+        if (!is_vertical && i == fixed)
+            continue;
+        for (uint8_t j = 0; j < N; ++j)
         {
-            if ( (is_vertical && n != j && m[i][n] == line[k])
-             || (!is_vertical && n != i && m[n][j] == line[k]))
+            if (is_vertical && j == fixed)
+                continue;
+            if ((is_vertical && m[i][j] == m[i][fixed]) || (!is_vertical && m[i][j] == m[fixed][j]))
                 return {};
         }
-        m[i][j] = line[k];
     }
     return m;
 }
@@ -363,7 +370,7 @@ SkyScrappers<N>::Solve(const int* clues)
         if (clues_[i] != 0 && clues_[i] != N)
             pending.emplace_back(i);
 
-    
+
     std::vector<Matrix> candidates{matrix};
     while (!pending.empty())
     {
