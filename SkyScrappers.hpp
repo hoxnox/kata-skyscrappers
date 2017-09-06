@@ -11,10 +11,11 @@
 #include <iostream>
 #include <sstream>
 #include <memory>
+#include <chrono>
 
 #define INFO "INFO"
 #define ERROR "ERROR"
-#define LOG(X) std::cout << (X) << ": "
+#define LOG(X) std::cout << (X) << " " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() << ": "
 
 template<uint8_t N>
 class SkyScrappers
@@ -51,7 +52,7 @@ private:
     static Matrix fill(Matrix matrix, std::array<uint8_t, N> line, int idx);
     ///@brief get all possible lines for the given clue and try to fill for all templates
     std::vector<Matrix> generate(std::array<uint8_t, N*4> clues, int i,
-                                 const std::vector<Matrix>& templates);
+                                 const std::vector<Matrix>& templates, size_t max);
     ///@brief replace matrix element with given element if it's possible
     static Matrix fill(Matrix matrix, uint8_t n, uint8_t i, uint8_t j);
     ///@brief For every possible clue try to fill given element for all templates
@@ -241,12 +242,14 @@ SkyScrappers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
 template<uint8_t N>
 std::vector<typename SkyScrappers<N>::Matrix>
 SkyScrappers<N>::generate(std::array<uint8_t, N*4> clues, int i,
-                          const std::vector<SkyScrappers<N>::Matrix>& templates)
+                          const std::vector<SkyScrappers<N>::Matrix>& templates, size_t max)
 {
     if (clues[i] == 0)
         return templates;
 
     std::vector<Matrix> rs;
+    if (max < std::numeric_limits<size_t>::max())
+        rs.reserve(max);
     uint8_t rclue = clues[ridx(i)];
     for (const auto& tpl : templates)
     {
@@ -258,8 +261,13 @@ SkyScrappers<N>::generate(std::array<uint8_t, N*4> clues, int i,
                 if (!matrix.empty())
                     rs.emplace_back(std::move(matrix));
             }
+            if (rs.size() > max)
+                break;
         }
+        if (rs.size() > max)
+            break;
     }
+    rs.shrink_to_fit();
     return rs;
 }
 
@@ -353,12 +361,11 @@ SkyScrappers<N>::Solve(const int* clues)
         if (clues_[i] != 0 && clues_[i] != N)
             pending.emplace_back(i);
 
-
     std::vector<Matrix> candidates{matrix};
     while (!pending.empty())
     {
-        if (best_prev != 0)
-            pending.sort([best_prev](const uint8_t& lhv, const uint8_t& rhv) { return (lhv/N%2) != (best_prev/N%2); });
+        pending.sort([this](const uint8_t& lhv, const uint8_t& rhv)
+                { return permutations_[lhv].size() < permutations_[rhv].size();});
         auto best_pending = pending.begin();
         std::vector<Matrix> best_candidates;
         size_t min_sz = std::numeric_limits<size_t>::max();
@@ -368,7 +375,7 @@ SkyScrappers<N>::Solve(const int* clues)
             if (find(rskip, *cur) != rskip.end())
                 continue;
 
-            auto tmp = generate(clues_, *cur, candidates);
+            auto tmp = generate(clues_, *cur, candidates, min_sz);
             LOG(INFO) << "   check " << (int)*cur << ": " << tmp.size() << std::endl;
             if (clues_[ridx(*cur)] != 0)
                 rskip.emplace_back(ridx(*cur));
