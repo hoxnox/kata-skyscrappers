@@ -23,6 +23,86 @@ protected:
     SkyScrappers<7> ss7;
 };
 
+TEST_F(TestSkyScrappers, wheel_bottom)
+{
+    SkyScrappers<7>::Matrix m = { { 2, 1, 6, 4, 3, 7, 5 },
+                                  { 3, 2, 5, 7, 4, 6, 1 },
+                                  { 4, 6, 7, 5, 1, 2, 3 },
+                                  { 1, 3, 2, 6, 7, 5, 4 },
+                                  { 5, 7, 1, 3, 2, 4, 6 },
+                                  { 6, 4, 3, 2, 5, 1, 7 },
+                                  { 7, 5, 4, 1, 6, 3, 2 } };
+    std::stringstream ss;
+    bool rs = SkyScrappers<7>::wheel(m, 2,
+       [&ss](uint8_t i, uint8_t j, uint8_t& v, SkyScrappers<7>::Direction d) -> bool
+       {
+           ss << (int)i << (int)j << (int)v;
+           return true;
+       });
+    EXPECT_TRUE(rs);
+    EXPECT_EQ("026125227322421523624", ss.str());
+}
+
+TEST_F(TestSkyScrappers, wheel_left)
+{
+    SkyScrappers<7>::Matrix m = { { 2, 1, 6, 4, 3, 7, 5 },
+                                  { 3, 2, 5, 7, 4, 6, 1 },
+                                  { 4, 6, 7, 5, 1, 2, 3 },
+                                  { 1, 3, 2, 6, 7, 5, 4 },
+                                  { 5, 7, 1, 3, 2, 4, 6 },
+                                  { 6, 4, 3, 2, 5, 1, 7 },
+                                  { 7, 5, 4, 1, 6, 3, 2 } };
+    std::stringstream ss;
+    bool rs = SkyScrappers<7>::wheel(m, 9,
+       [&ss](uint8_t i, uint8_t j, uint8_t& v, SkyScrappers<7>::Direction d) -> bool
+       {
+           ss << (int)i << (int)j << (int)v;
+           return true;
+       });
+    EXPECT_TRUE(rs);
+    EXPECT_EQ("263252241235227216204", ss.str());
+}
+
+TEST_F(TestSkyScrappers, wheel_top)
+{
+    SkyScrappers<7>::Matrix m = { { 2, 1, 6, 4, 3, 7, 5 },
+                                  { 3, 2, 5, 7, 4, 6, 1 },
+                                  { 4, 6, 7, 5, 1, 2, 3 },
+                                  { 1, 3, 2, 6, 7, 5, 4 },
+                                  { 5, 7, 1, 3, 2, 4, 6 },
+                                  { 6, 4, 3, 2, 5, 1, 7 },
+                                  { 7, 5, 4, 1, 6, 3, 2 } };
+    std::stringstream ss;
+    bool rs = SkyScrappers<7>::wheel(m, 19,
+       [&ss](uint8_t i, uint8_t j, uint8_t& v, SkyScrappers<7>::Direction d) -> bool
+       {
+           ss << (int)i << (int)j << (int)v;
+           return true;
+       });
+    EXPECT_TRUE(rs);
+    EXPECT_EQ("615514417313216112011", ss.str());
+}
+
+TEST_F(TestSkyScrappers, wheel_right)
+{
+    SkyScrappers<7>::Matrix m = { { 2, 1, 6, 4, 3, 7, 5 },
+                                  { 3, 2, 5, 7, 4, 6, 1 },
+                                  { 4, 6, 7, 5, 1, 2, 3 },
+                                  { 1, 3, 2, 6, 7, 5, 4 },
+                                  { 5, 7, 1, 3, 2, 4, 6 },
+                                  { 6, 4, 3, 2, 5, 1, 7 },
+                                  { 7, 5, 4, 1, 6, 3, 2 } };
+    std::stringstream ss;
+    bool rs = SkyScrappers<7>::wheel(m, 27,
+       [&ss](uint8_t i, uint8_t j, uint8_t& v, SkyScrappers<7>::Direction d) -> bool
+       {
+           ss << (int)i << (int)j << (int)v;
+           return true;
+       });
+    EXPECT_TRUE(rs);
+    EXPECT_EQ("002011026034043057065", ss.str());
+}
+
 TEST_F(TestSkyScrappers, ridx)
 {
     EXPECT_EQ( 0, SkyScrappers<7>::ridx(20));

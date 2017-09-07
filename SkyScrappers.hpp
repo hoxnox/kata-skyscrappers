@@ -34,6 +34,17 @@ public:
     ///@brief get clue counterpart index
     static uint8_t ridx(uint8_t i) { return (N-1 - i%N) + N*(i/N) + (i<N*2 ? 1 : -1)*2*N; }
 
+    enum class Direction : uint8_t
+    {
+        BOTTOM = 0,
+        LEFT   = 1,
+        TOP    = 2,
+        RIGHT  = 3,
+    };
+    static bool is_vertical(const Direction& dir) { return (uint8_t)dir%2 == 0; }
+    static bool wheel(Matrix& m, uint8_t idx,
+        std::function<bool(uint8_t i, uint8_t j, uint8_t&, Direction)> oper);
+
 private:
     std::array<uint8_t, N*4> clues_{};
     int                      matrix_{};
@@ -52,7 +63,8 @@ private:
     static Matrix fill(Matrix matrix, std::array<uint8_t, N> line, int idx);
     ///@brief get all possible lines for the given clue and try to fill for all templates
     std::vector<Matrix> generate(std::array<uint8_t, N*4> clues, int i,
-                                 const std::vector<Matrix>& templates, size_t max);
+                                 const std::vector<Matrix>& templates, size_t max,
+                                 const std::list<uint8_t>& tocheck_idx);
     ///@brief replace matrix element with given element if it's possible
     static Matrix fill(Matrix matrix, uint8_t n, uint8_t i, uint8_t j);
     ///@brief For every possible clue try to fill given element for all templates
@@ -63,6 +75,33 @@ private:
     std::vector<std::shared_ptr<std::array<int*, N>>> storage_;
     std::vector<std::shared_ptr<std::array<int, N>>> row_storage_;
 };
+
+template<uint8_t N>
+inline bool
+SkyScrappers<N>::wheel(Matrix& m, uint8_t idx,
+        std::function<bool(uint8_t i, uint8_t j, uint8_t&, Direction)> oper)
+{
+    uint8_t fixed = (idx<2*N ? idx%N : N-1-idx%N);
+    Direction dir = (Direction)(idx/N);
+
+    for (uint8_t k = 0; k < N; ++k)
+    {
+        uint8_t i = k;
+        if (dir == Direction::LEFT || dir == Direction::TOP)
+            i = N-1 - k; 
+        if (is_vertical(dir))
+        {
+            if (!oper(i, fixed, m[i][fixed], dir))
+                return false;
+        }
+        else
+        {
+            if (!oper(fixed, i, m[fixed][i], dir))
+                return false;
+        }
+    }
+    return true;
+}
 
 template<uint8_t N>
 std::string
@@ -210,39 +249,37 @@ template<uint8_t N>
 inline typename SkyScrappers<N>::Matrix
 SkyScrappers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
 {
-    uint8_t fixed = (idx<2*N ? idx%N : N-1-idx%N);
-    uint8_t direction = idx/N;
-    if (direction==1 || direction==2)
-        std::reverse(line.begin(), line.end());
-    bool is_vertical = (direction%2==0);
-
-    for (uint8_t i = 0; i < N; ++i)
-    {
-        uint8_t& v = (is_vertical ? m[i][fixed] : m[fixed][i]);
-        if (v != 0 && v != line[i])
-            return {};
-        v = line[i];
-    }
-
-    for (uint8_t i = 0; i < N; ++i)
-    {
-        if (!is_vertical && i == fixed)
-            continue;
-        for (uint8_t j = 0; j < N; ++j)
-        {
-            if (is_vertical && j == fixed)
-                continue;
-            if ((is_vertical && m[i][j] == m[i][fixed]) || (!is_vertical && m[i][j] == m[fixed][j]))
-                return {};
-        }
-    }
+    uint8_t n = 0;
+    bool rs = wheel(m, idx, [&line, &n](uint8_t, uint8_t, uint8_t& v, Direction)
+                            {
+                                if (v != 0 && v != line[n])
+                                  return false;
+                                v = line[n++];
+                                return true;
+                            });
+    if (!rs)
+        return {};
+    rs = wheel(m, idx, [&m](uint8_t i, uint8_t j, uint8_t& v, Direction dir)
+                       {
+                           for (uint8_t k = 0; k < N; ++k)
+                           {
+                               if (is_vertical(dir) && k != j && m[i][k] == v)
+                                   return false;
+                               else if (!is_vertical(dir) && k != i && m[k][j] == v)
+                                   return false;
+                           }
+                           return true;
+                       });
+    if (!rs)
+        return {};
     return m;
 }
 
 template<uint8_t N>
 std::vector<typename SkyScrappers<N>::Matrix>
 SkyScrappers<N>::generate(std::array<uint8_t, N*4> clues, int i,
-                          const std::vector<SkyScrappers<N>::Matrix>& templates, size_t max)
+                          const std::vector<SkyScrappers<N>::Matrix>& templates, size_t max,
+                          const std::list<uint8_t>& idx_tocheck)
 {
     if (clues[i] == 0)
         return templates;
@@ -259,7 +296,47 @@ SkyScrappers<N>::generate(std::array<uint8_t, N*4> clues, int i,
             {
                 auto matrix = fill(tpl, line.line, i);
                 if (!matrix.empty())
-                    rs.emplace_back(std::move(matrix));
+                {
+                    auto check = [&clues, &matrix, &i, &idx_tocheck]() -> bool
+                    {
+                        for (const auto& idx : idx_tocheck)
+                        {
+                            if (idx == i)
+                                continue;
+                            std::array<uint8_t, N+1> filled_map{};
+                            wheel(matrix, idx,
+                                    [&filled_map](uint8_t, uint8_t, uint8_t v, Direction) -> bool
+                                    {
+                                        filled_map[v] = 1;
+                                        return true;
+                                    });
+                            uint8_t max_height_avail = N;
+                            while (filled_map[max_height_avail] == 1)
+                                --max_height_avail;
+                            uint8_t vision = 0; uint8_t max_height = 0;
+                            wheel(matrix, idx,
+                                    [max_height_avail, &max_height, &vision](uint8_t, uint8_t, uint8_t v, Direction) -> bool
+                                    {
+                                        if (v == 0 && max_height_avail > max_height)
+                                            max_height = max_height_avail;
+                                        if (v > max_height)
+                                        {
+                                            max_height = v;
+                                            ++vision;
+                                        }
+                                        return true;
+                                    });
+                            if (vision > clues[idx])
+                            {
+                                //LOG(INFO) << " DOESN'T MET: " << (int)idx << "(" << (int)clues[idx] << ") vision=" << (int)vision <<" max_height_avail=" << (int)max_height_avail << std::endl << matrix << std::endl;
+                                return false;
+                            }
+                        }
+                        return true;
+                    };
+                    if (check())
+                        rs.emplace_back(std::move(matrix));
+                }
             }
             if (rs.size() > max)
                 break;
@@ -334,7 +411,7 @@ SkyScrappers<N>::Solve(const int* clues)
 
     // matrix cell for clue = 1 is determined, we should fill it too
     auto clue1_ = std::find(clues, clues + 4*N, 1);
-    if (clue1_ != clues + 4*N)
+    while (clue1_ != clues + 4*N)
     {
         auto clue1 = clue1_ - clues;
         if (clue1 < N)
@@ -345,8 +422,8 @@ SkyScrappers<N>::Solve(const int* clues)
             matrix[N-1][N-1-clue1%N] = N;
         if (clue1 > 3*N && clue1 < 4*N)
             matrix[N-1-clue1%N][0] = N;
+        clue1_ = std::find(clue1_+1, clues + 4*N, 1);
     }
-
 
     auto find = [](const std::list<uint8_t>& list, uint8_t val) -> std::list<uint8_t>::const_iterator
     {
@@ -356,41 +433,82 @@ SkyScrappers<N>::Solve(const int* clues)
                 break;
         return i;
     };
-    std::list<uint8_t> pending;
+    std::list<uint8_t> pending, filled;
     for (uint8_t i = 0; i < clues_.size(); ++i)
+    {
         if (clues_[i] != 0 && clues_[i] != N)
+        {
+            if (clues[ridx(i)] != 0 && i >= N*2)
+                continue;
             pending.emplace_back(i);
+        }
+    }
+
+    for (const auto& p : pending)
+        LOG(INFO) << (int)p << " " << permutations_[clues[p]].size() << std::endl;
 
     std::vector<Matrix> candidates{matrix};
     while (!pending.empty())
     {
+        std::list<uint8_t> good_pending;
+        Matrix window_matrix{N};
+        for (const auto& f : filled)
+        {
+            wheel(window_matrix, f,
+                    [](uint8_t, uint8_t, uint8_t& v, Direction) -> bool
+                    {
+                        v = 1;
+                        return true;
+                    });
+        }
+        uint8_t min_cnt = N;
+        for (const auto& p : pending)
+        {
+            uint8_t cnt = 0;
+            wheel(window_matrix, p,
+                    [&cnt](uint8_t, uint8_t, uint8_t& v, Direction) -> bool
+                    {
+                        if (v == 0)
+                            ++cnt;
+                        return true;
+                    });
+            if (cnt < min_cnt)
+            {
+                min_cnt = cnt;
+                good_pending.clear();
+                good_pending.emplace_back(p);
+            }
+            else if (cnt == min_cnt)
+            {
+                good_pending.emplace_back(p);
+            }
+        }
+        for (const auto& g : good_pending)
+            LOG(INFO) << (int)min_cnt << " " << (int)g << std::endl;
         pending.sort([this](const uint8_t& lhv, const uint8_t& rhv)
                 { return permutations_[lhv].size() < permutations_[rhv].size();});
         auto best_pending = pending.begin();
         std::vector<Matrix> best_candidates;
         size_t min_sz = std::numeric_limits<size_t>::max();
-        std::list<uint8_t> rskip;
         for(auto cur = pending.begin(); cur != pending.end(); ++cur)
         {
-            if (find(rskip, *cur) != rskip.end())
+            if (permutations_[*cur].size() > 1000 && !good_pending.empty() && find(good_pending, *cur) == good_pending.end())
                 continue;
-
-            auto tmp = generate(clues_, *cur, candidates, min_sz);
-            LOG(INFO) << "   check " << (int)*cur << ": " << tmp.size() << std::endl;
-            if (clues_[ridx(*cur)] != 0)
-                rskip.emplace_back(ridx(*cur));
+            auto tmp = generate(clues_, *cur, candidates, min_sz, pending);
+            LOG(INFO) << "   check " << (int)*cur << "(" << (int)clues_[*cur] << "): " << tmp.size() << std::endl;
             if (tmp.size() < min_sz && tmp.size() > 0)
             {
                 best_candidates = tmp;
                 min_sz = tmp.size();
                 best_pending = cur;
                 best_prev = *cur;
-                if (min_sz <= candidates.size()*4)
+                if (min_sz < candidates.size()*4)
                     break;
             }
         }
         candidates = best_candidates;
         LOG(INFO) << "generated " << (int)*best_pending << "(" << (int)clues_[*best_pending] << "): " << candidates.size() << std::endl;
+        filled.emplace_back(best_prev);
         pending.erase(best_pending);
         if (clues_[ridx(best_prev)] != 0)
         {
