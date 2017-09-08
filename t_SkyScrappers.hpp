@@ -23,78 +23,6 @@ protected:
     SkyScrappers<7> ss7;
 };
 
-TEST_F(TestSkyScrappers, getLine_top)
-{
-    SkyScrappers<4>::Matrix etalon =
-        { { 1, 3, 4, 2 },
-          { 4, 2, 1, 3 },
-          { 3, 4, 2, 1 },
-          { 2, 1, 3, 4 } };
-    auto line = SkyScrappers<4>::getLine(etalon, 1);
-    EXPECT_EQ(3, *line[0]);
-    EXPECT_EQ(2, *line[1]);
-    EXPECT_EQ(4, *line[2]);
-    EXPECT_EQ(1, *line[3]);
-}
-
-TEST_F(TestSkyScrappers, getLine_right)
-{
-    SkyScrappers<4>::Matrix etalon =
-        { { 1, 3, 4, 2 },
-          { 4, 2, 1, 3 },
-          { 3, 4, 2, 1 },
-          { 2, 1, 3, 4 } };
-    auto line = SkyScrappers<4>::getLine(etalon, 6);
-    EXPECT_EQ(1, *line[0]);
-    EXPECT_EQ(2, *line[1]);
-    EXPECT_EQ(4, *line[2]);
-    EXPECT_EQ(3, *line[3]);
-}
-
-TEST_F(TestSkyScrappers, getLine_bottom)
-{
-    SkyScrappers<4>::Matrix etalon =
-        { { 1, 3, 4, 2 },
-          { 4, 2, 1, 3 },
-          { 3, 4, 2, 1 },
-          { 2, 1, 3, 4 } };
-    auto line = SkyScrappers<4>::getLine(etalon, 10);
-    EXPECT_EQ(1, *line[0]);
-    EXPECT_EQ(4, *line[1]);
-    EXPECT_EQ(2, *line[2]);
-    EXPECT_EQ(3, *line[3]);
-
-    SkyScrappers<6>::Matrix etalon6 =
-    { { 2, 1, 4, 3, 5, 6},
-      { 1, 6, 3, 2, 4, 5},
-      { 4, 3, 6, 5, 1, 2},
-      { 6, 5, 2, 1, 3, 4},
-      { 5, 4, 1, 6, 2, 3},
-      { 3, 2, 5, 4, 6, 1} };
-    auto line6 = SkyScrappers<6>::getLine(etalon6, 13);
-    EXPECT_EQ(6, *line6[0]);
-    EXPECT_EQ(2, *line6[1]);
-    EXPECT_EQ(3, *line6[2]);
-    EXPECT_EQ(1, *line6[3]);
-    EXPECT_EQ(4, *line6[4]);
-    EXPECT_EQ(5, *line6[5]);
-}
-
-
-TEST_F(TestSkyScrappers, getLine_left)
-{
-    SkyScrappers<4>::Matrix etalon =
-        { { 1, 3, 4, 2 },
-          { 4, 2, 1, 3 },
-          { 3, 4, 2, 1 },
-          { 2, 1, 3, 4 } };
-    auto line = SkyScrappers<4>::getLine(etalon, 15);
-    EXPECT_EQ(1, *line[0]);
-    EXPECT_EQ(3, *line[1]);
-    EXPECT_EQ(4, *line[2]);
-    EXPECT_EQ(2, *line[3]);
-}
-
 TEST_F(TestSkyScrappers, ridx)
 {
     EXPECT_EQ( 0, SkyScrappers<7>::ridx(20));
@@ -235,20 +163,6 @@ TEST_F(TestSkyScrappers, happy2_7x7)
               +---------------------+
                 6           2  4
                20          16 15
-
-                   1  2     4
-                   2  3     2
-              +---------------------+
-         27 1 | 7, 6, 2, 1, 5, 4, 3 | 5 7
-         26 4 | 1, 3, 5, 4, 2, 7, 6 |
-         25 2 | 6, 5, 4, 7, 3, 2, 1 | 4 9
-         24 2 | 5, 1, 7, 6, 4, 3, 2 | 5 10
-         23 2 | 4, 2, 1, 3, 7, 6, 5 |
-         22 2 | 3, 7, 6, 2, 1, 5, 4 | 4 12
-         21 5 | 2, 4, 3, 5, 6, 1, 7 |
-              +---------------------+
-                6           2  4
-               20          16 15
      */
     std::array<int, 7*4> clues = { 0, 2, 3, 0, 2, 0, 0, 5, 0, 4, 5, 0, 4, 0, 0, 4, 2, 0, 0, 0, 6, 5, 2, 2, 2, 2, 4, 1 };
     int etalon[7][7] = { { 7, 6, 2, 1, 5, 4, 3 },
@@ -258,6 +172,35 @@ TEST_F(TestSkyScrappers, happy2_7x7)
                          { 4, 2, 1, 3, 7, 6, 5 },
                          { 3, 7, 6, 2, 1, 5, 4 },
                          { 2, 4, 3, 5, 6, 1, 7 } };
+    EXPECT_EQ(1, equal(ss7.Solve(clues.data()), etalon)) << ss7.PrintLastMatrix();
+}
+
+TEST_F(TestSkyScrappers, happy3_7x7)
+{
+    /*
+      0 1 2 3 4 5 6 
+      6 4   2     3   
+    +---------------+ 
+27 3| 2 1 6 4 3 7 5 |  7
+26  | 3 2 5 7 4 6 1 |3 8
+25  | 4 6 7 5 1 2 3 |3 9
+24 4| 1 3 2 6 7 5 4 |3 10
+23  | 5 7 1 3 2 4 6 |  11
+22  | 6 4 3 2 5 1 7 |  12
+21  | 7 5 4 1 6 3 2 |4 13
+    +---------------+ 
+        2   5   5    
+      20191817161514
+
+     */
+    std::array<int, 7*4> clues = { 6, 4, 0, 2, 0, 0, 3, 0, 3, 3, 3, 0, 0, 4, 0, 5, 0, 5, 0, 2, 0, 0, 0, 0, 4, 0, 0, 3 };
+    int etalon[7][7] = { { 2, 1, 6, 4, 3, 7, 5 },
+                         { 3, 2, 5, 7, 4, 6, 1 },
+                         { 4, 6, 7, 5, 1, 2, 3 },
+                         { 1, 3, 2, 6, 7, 5, 4 },
+                         { 5, 7, 1, 3, 2, 4, 6 },
+                         { 6, 4, 3, 2, 5, 1, 7 },
+                         { 7, 5, 4, 1, 6, 3, 2 } };
     EXPECT_EQ(1, equal(ss7.Solve(clues.data()), etalon)) << ss7.PrintLastMatrix();
 }
 
