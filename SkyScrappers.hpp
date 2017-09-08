@@ -321,15 +321,18 @@ SkyScrappers<N>::Solve(const int* clues)
 
     uint8_t best_prev = 0;
 
+    uint8_t filled[] = {0, 0};
     // The line for clue = N is determined, we should fill it
     auto clueN = std::find(clues, clues + 4*N, N);
-    if (clueN != clues + 4*N)
+    while (clueN != clues + 4*N)
     {
         Line line;
         for (uint8_t i = 0; i < N; ++i)
             line[i] = i + 1;
         matrix = fill(matrix, line, clueN - clues);
         best_prev = clueN-clues;
+        ++filled[(clueN-clues)/N%2];
+        clueN = std::find(clueN+1, clues + 4*N, N);
     }
 
     // matrix cell for clue = 1 is determined, we should fill it too
@@ -364,8 +367,39 @@ SkyScrappers<N>::Solve(const int* clues)
     std::vector<Matrix> candidates{matrix};
     while (!pending.empty())
     {
-        pending.sort([this](const uint8_t& lhv, const uint8_t& rhv)
-                { return permutations_[lhv].size() < permutations_[rhv].size();});
+        pending.sort([this, clues, filled](const uint8_t& lhv, const uint8_t& rhv)
+                {
+                    size_t lperm = permutations_[clues[lhv]].size();
+                    size_t rperm = permutations_[clues[rhv]].size();
+
+                    if (clues[ridx(lhv)] != 0)
+                    {
+                        size_t count = 0;
+                        for (const auto& p : permutations_[clues[lhv]])
+                            if (p.rev_vision == clues[ridx(lhv)])
+                                ++count;
+                        lperm = count;
+                    }
+
+                    if (clues[ridx(rhv)] != 0)
+                    {
+                        size_t count = 0;
+                        for (const auto& p : permutations_[clues[rhv]])
+                            if (p.rev_vision == clues[ridx(rhv)])
+                                ++count;
+                        rperm = count;
+                    }
+
+                    size_t lredux = 1;
+                    for (uint8_t i = 0; i < filled[(lhv+1)/N%2]; ++i)
+                        lredux *= N-i;
+
+                    size_t rredux = 1;
+                    for (uint8_t i = 0; i < filled[(rhv+1)/N%2]; ++i)
+                        rredux *= N-i;
+
+                    return lperm/lredux < rperm/rredux;
+                });
         auto best_pending = pending.begin();
         std::vector<Matrix> best_candidates;
         size_t min_sz = std::numeric_limits<size_t>::max();
@@ -392,6 +426,7 @@ SkyScrappers<N>::Solve(const int* clues)
         candidates = best_candidates;
         LOG(INFO) << "generated " << (int)*best_pending << "(" << (int)clues_[*best_pending] << "): " << candidates.size() << std::endl;
         pending.erase(best_pending);
+        ++filled[best_prev/N%2];
         if (clues_[ridx(best_prev)] != 0)
         {
             auto tmp = find(pending, ridx(best_prev));
