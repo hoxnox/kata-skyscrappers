@@ -13,6 +13,9 @@ template<uint8_t N>
 std::string
 print(int** matrix, std::array<int, N*4> clues = {})
 {
+    if (!matrix)
+        return "";
+
     auto clue_as_char =
         [](uint8_t clue) -> char
         {

@@ -90,6 +90,9 @@ private:
     ///@brief get indices for non zero and non N clues without counterparts
     std::list<uint8_t> clue_indices() const;
 
+    static bool wheel(Matrix& m, uint8_t fixed, bool fwd, bool is_vertical,
+        std::function<bool(uint8_t i, uint8_t j, uint8_t&)> oper);
+
     // storage for answers (4x4 task requires int** as output)
     std::vector<std::shared_ptr<std::array<int*, N>>> storage_;
     std::vector<std::shared_ptr<std::array<int, N>>> row_storage_;
@@ -162,37 +165,37 @@ SkyScrapers<N>::SkyScrapers()
     }
 }
 
+
+
 template<uint8_t N>
 inline typename SkyScrapers<N>::Matrix
 SkyScrapers<N>::fill(Matrix m, const uint8_t* iline, bool fwd, uint8_t fixed, bool is_vertical)
 {
-    // make attempt to fill line, if it's not possible - return empty matrix
-    for (uint8_t i = 0; i < N; ++i)
-    {
-        uint8_t& v = (is_vertical ? m[i][fixed] : m[fixed][i]);
-        if (v != 0 && v != *iline)
-            return {};
-        v = *iline;
-        if (fwd)
-            ++iline;
-        else
-            --iline;
-    }
+    bool rs = wheel(m, fixed, fwd, is_vertical,
+                    [&iline](uint8_t, uint8_t, uint8_t& v)
+                    {
+                        if (v != 0 && v != *iline)
+                          return false;
+                        v = *iline++;
+                        return true;
+                    });
+    if (!rs)
+        return {};
 
-    // check row and col for duplicates
-    for (uint8_t i = 0; i < N; ++i)
-    {
-        if (!is_vertical && i == fixed)
-            continue;
-        for (uint8_t j = 0; j < N; ++j)
-        {
-            if (is_vertical && j == fixed)
-                continue;
-            if ((is_vertical && m[i][j] == m[i][fixed]) || (!is_vertical && m[i][j] == m[fixed][j]))
-                return {};
-        }
-    }
-
+    rs = wheel(m, fixed, fwd, is_vertical,
+               [m, is_vertical](uint8_t i, uint8_t j, uint8_t& v)
+               {
+                   for (uint8_t k = 0; k < N; ++k)
+                   {
+                       if (is_vertical && k != j && m[i][k] == v)
+                           return false;
+                       else if (!is_vertical && k != i && m[k][j] == v)
+                           return false;
+                   }
+                   return true;
+               });
+    if (!rs)
+        return {};
     return m;
 }
 
@@ -212,6 +215,9 @@ SkyScrapers<N>::generate(int i, const std::vector<SkyScrapers<N>::Matrix>& templ
     uint8_t fixed = (i<2*N ? i%N : N-1-i%N);
     uint8_t direction = i/N;
     bool is_vertical = (direction%2==0);
+    size_t dropper = 0;
+
+    LOG(INFO) << templates.size() << " x " << (int)permutations_[clues_[i]].size() << std::endl;
 
     for (const auto& tpl : templates)
     {
@@ -220,7 +226,7 @@ SkyScrapers<N>::generate(int i, const std::vector<SkyScrapers<N>::Matrix>& templ
             if (rclue == 0 || line.rev_vision == rclue)
             {
                 auto matrix = (direction==1 || direction==2) ?
-                    fill(tpl, line.line.data() + N-1, false, fixed, is_vertical) :
+                    fill(tpl, line.line.data(), false, fixed, is_vertical) :
                     fill(tpl, line.line.data(), true, fixed, is_vertical);
                 if (!matrix.empty())
                 {
@@ -291,7 +297,7 @@ SkyScrapers<N>::fill_simple_clues(Matrix& matrix)
         uint8_t direction = idx/N;
         bool is_vertical = (direction%2==0);
         matrix = (direction == 1 || direction == 2) ?
-              fill(matrix, line.data() + N-1, false, fixed, is_vertical) :
+              fill(matrix, line.data(), false, fixed, is_vertical) :
               fill(matrix, line.data(), true, fixed, is_vertical);        ++filled_[idx/N%2];
         clueN = std::find(clueN+1, clues_.end(), N);
     }
@@ -386,3 +392,26 @@ SkyScrapers<N>::clue_indices() const
     return rs;
 }
 
+template<uint8_t N>
+inline bool
+SkyScrapers<N>::wheel(Matrix& m, uint8_t fixed, bool fwd, bool is_vertical,
+        std::function<bool(uint8_t i, uint8_t j, uint8_t&)> oper)
+{
+    for (uint8_t k = 0; k < N; ++k)
+    {
+        uint8_t i = k;
+        if (!fwd)
+            i = N-1 - k;
+        if (is_vertical)
+        {
+            if (!oper(i, fixed, m[i][fixed]))
+                return false;
+        }
+        else
+        {
+            if (!oper(fixed, i, m[fixed][i]))
+                return false;
+        }
+    }
+    return true;
+}
