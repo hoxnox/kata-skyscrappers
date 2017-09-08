@@ -1,7 +1,7 @@
 /**@author hoxnox <hoxnox@gmail.com>
  * @date 20170830
  *
- * https://github.com/hoxnox/skyscrappers*/
+ * https://github.com/hoxnox/kata-skyscrapers*/
 
 #include <vector>
 #include <list>
@@ -13,116 +13,11 @@
 #include <memory>
 #include <chrono>
 
-#define INFO "INFO"
-#define ERROR "ERROR"
-#define LOG(X) std::cout << (X) << " " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() << ": "
+#include "SkyScrapersHelpers.hpp"
 
-template<uint8_t N>
-class SkyScrappers
-{
-public:
-    SkyScrappers();
-
-    int** Solve(const int* clues);
-    int** GetLastMatrix() const { return (int**)storage_[matrix_].data(); }
-    std::string PrintLastMatrix() const;
-
-public:
-    using Line = std::array<uint8_t, N>;
-    using Matrix = std::vector<Line>;
-
-    ///@brief get clue counterpart index
-    static uint8_t ridx(uint8_t i) { return (N-1 - i%N) + N*(i/N) + (i<N*2 ? 1 : -1)*2*N; }
-
-private:
-    std::array<uint8_t, N*4> clues_{};
-    int                      matrix_{};
-
-    // pre-generated permutations and visions 0 -> {}, 1 -> {{{3, 2, 1}, 3}, {{3, 1, 2}, 2}}, ...
-    typedef struct Permutation__
-    {
-        Permutation__(Line& line = {}, uint8_t rev_vision = 0)
-            : line(line), rev_vision(rev_vision) {};
-        Line line;
-        uint8_t rev_vision;
-    } Permutation;
-    std::array<std::vector<Permutation>, N> permutations_{};
-
-    ///@brief replace matrix line with given line by clue index if it's possible
-    static Matrix fill(Matrix matrix, std::array<uint8_t, N> line, int idx);
-    ///@brief get all possible lines for the given clue and try to fill for all templates
-    std::vector<Matrix> generate(std::array<uint8_t, N*4> clues, int i,
-                                 const std::vector<Matrix>& templates, size_t max);
-    ///@brief replace matrix element with given element if it's possible
-    static Matrix fill(Matrix matrix, uint8_t n, uint8_t i, uint8_t j);
-    ///@brief For every possible clue try to fill given element for all templates
-    std::vector<Matrix> generate(uint8_t i, uint8_t j,
-                                 const std::vector<Matrix>& templates);
-
-    // storage for answers (task requires int** as output)
-    std::vector<std::shared_ptr<std::array<int*, N>>> storage_;
-    std::vector<std::shared_ptr<std::array<int, N>>> row_storage_;
-};
-
-template<uint8_t N>
-std::string
-SkyScrappers<N>::PrintLastMatrix() const
-{
-    auto clue_as_char =
-        [](uint8_t clue) -> char
-        {
-            return ((clue > 0 && clue <= 9) ? clue + '0' : ' ');
-        };
-
-    auto print_clues =
-        [&clue_as_char](std::ostream& s, std::array<uint8_t, N*4> clues, int start) -> void
-        {
-            s << "   ";
-            if (start < N*2)
-            {
-                for (int i = start; i < start + N; ++i)
-                    s << clue_as_char(clues[i]) << ' ';
-            }
-            else
-            {
-                for (int i = start + N - 1; i >= start; --i)
-                    s << clue_as_char(clues[i]) << ' ';
-            }
-            s << "  \n";
-        };
-
-    auto print_row =
-        [&clue_as_char](std::ostream& s,
-                        uint8_t lclue,
-                        int* row,
-                        uint8_t rclue) -> void
-        {
-            s << clue_as_char(lclue) << "| ";
-            for (uint8_t i = 0; i < N; ++i)
-                s << row[i] << ' ';
-            s << "|" << clue_as_char(rclue) << '\n';
-        };
-
-    auto print_line = [](std::ostream& s) -> void
-        {
-            s << " +" << std::string(N*2, '-') << "-+ \n";
-        };
-
-    std::stringstream ss;
-    print_clues(ss, clues_, 0);
-    print_line(ss);
-    for (uint8_t i = 0; i < N; ++i)
-    {
-        auto mtx = storage_[matrix_];
-        print_row(ss, clues_[N*4-1-i], (*mtx)[i], clues_[N+i]);
-    }
-    print_line(ss);
-    print_clues(ss, clues_, N*2);
-    return ss.str();
-}
-
+/**@brief calculate vision for given line*/
 template<class FwIt>
-uint8_t
+inline uint8_t
 vision(FwIt begin, FwIt end)
 {
     uint8_t vision = 0;
@@ -140,48 +35,54 @@ vision(FwIt begin, FwIt end)
 }
 
 template<uint8_t N>
-std::ostream&
-print(std::ostream& s, const std::array<uint8_t, N>& arr)
+class SkyScrapers
 {
-    s << "{";
-    std::string delim;
-    for (const auto& v : arr)
-    {
-        s << delim << (int)v;
-        delim = ", ";
-    }
-    s << "};";
-    return s;
-}
+public:
+    SkyScrapers();
 
-std::ostream& operator<<(std::ostream& s, const std::array<uint8_t, 9>& arr) { print<9>(s, arr); return s; }
-std::ostream& operator<<(std::ostream& s, const std::array<uint8_t, 4>& arr) { print<4>(s, arr); return s; }
-std::ostream& operator<<(std::ostream& s, const std::array<uint8_t, 6>& arr) { print<6>(s, arr); return s; }
-std::ostream& operator<<(std::ostream& s, const std::array<uint8_t, 7>& arr) { print<7>(s, arr); return s; }
+    int** Solve(const int* clues);
+    int** GetLastMatrix() const { return (int**)storage_[matrix_]->data(); }
+
+private:
+    using Line = std::array<uint8_t, N>;
+    using Matrix = std::vector<Line>;
+
+    ///@brief get clue counterpart index
+    static uint8_t ridx(uint8_t i) { return (N-1 - i%N) + N*(i/N) + (i<N*2 ? 1 : -1)*2*N; }
+
+    std::array<uint8_t, N*4> clues_{};  // current task
+    int                      matrix_{}; // current solved matrix index
+
+    // pre-generated permutations and visions 0 -> {}, 1 -> {{{3, 2, 1}, 3}, {{3, 1, 2}, 2}}, ...
+    typedef struct Permutation__
+    {
+        Permutation__(Line& line = {}, uint8_t rev_vision = 0)
+            : line(line), rev_vision(rev_vision) {};
+        Line line;
+        uint8_t rev_vision;
+    } Permutation;
+    std::array<std::vector<Permutation>, N> permutations_{};
+
+    ///@brief replace matrix line with given line by clue index if it's possible
+    static Matrix fill(Matrix matrix, Line line, int idx);
+    ///@brief get all possible lines for the given clue and try to fill every template
+    ///
+    /// @param threshold - if the size of the result is greater then threshold - give up
+    std::vector<Matrix> generate(int clue_idx, const std::vector<Matrix>& templates, size_t threshold);
+
+    ///@brief replace matrix element with given element if it's possible
+    static Matrix fill(Matrix matrix, uint8_t element, uint8_t i, uint8_t j);
+    ///@brief For every possible clue try to fill given element for all templates
+    std::vector<Matrix> generate(uint8_t i, uint8_t j,
+                                 const std::vector<Matrix>& templates);
+
+    // storage for answers (4x4 task requires int** as output)
+    std::vector<std::shared_ptr<std::array<int*, N>>> storage_;
+    std::vector<std::shared_ptr<std::array<int, N>>> row_storage_;
+};
 
 template<uint8_t N>
-std::ostream&
-print(std::ostream& s, const std::vector<std::array<uint8_t, N>>& mtx)
-{
-    if (mtx.size() < N)
-        return s;
-    s << "{ ";
-    std::string delim;
-    for (const auto& arr : mtx)
-    {
-        s << delim << arr;
-        delim = ",\n  ";
-    }
-    s << " };";
-    return s;
-}
-std::ostream& operator<<(std::ostream& s, const std::vector<std::array<uint8_t, 9>>& mtx) { print<9>(s, mtx); return s; }
-std::ostream& operator<<(std::ostream& s, const std::vector<std::array<uint8_t, 4>>& mtx) { print<4>(s, mtx); return s; }
-std::ostream& operator<<(std::ostream& s, const std::vector<std::array<uint8_t, 6>>& mtx) { print<6>(s, mtx); return s; }
-std::ostream& operator<<(std::ostream& s, const std::vector<std::array<uint8_t, 7>>& mtx) { print<7>(s, mtx); return s; }
-
-template<uint8_t N>
-SkyScrappers<N>::SkyScrappers()
+SkyScrapers<N>::SkyScrapers()
 {
     if (N > 9)
         return;
@@ -194,21 +95,20 @@ SkyScrappers<N>::SkyScrappers()
         storage_.back()->at(i) = row_storage_.back()->data();
     }
 
+    // generate all permutations of {1, 2, ... N}
     std::array<uint8_t, N> v{};
     for (uint8_t i = 0; i < N; ++i)
         v[i] = i + 1;
-
     while(std::next_permutation(v.begin(), v.end()))
     {
         uint8_t vis = vision(v.begin(), v.end());
         permutations_[vis].emplace_back(v, vision(v.rbegin(), v.rend()));
-        //LOG(INFO) << v << " " << (int)permutations_[vis]->back().rev_vision << std::endl;
     }
 }
 
 template<uint8_t N>
-inline typename SkyScrappers<N>::Matrix
-SkyScrappers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
+inline typename SkyScrapers<N>::Matrix
+SkyScrapers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
 {
     uint8_t fixed = (idx<2*N ? idx%N : N-1-idx%N);
     uint8_t direction = idx/N;
@@ -216,6 +116,7 @@ SkyScrappers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
         std::reverse(line.begin(), line.end());
     bool is_vertical = (direction%2==0);
 
+    // make attempt to fill line, if it's not possible - return empty matrix
     for (uint8_t i = 0; i < N; ++i)
     {
         uint8_t& v = (is_vertical ? m[i][fixed] : m[fixed][i]);
@@ -224,6 +125,7 @@ SkyScrappers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
         v = line[i];
     }
 
+    // check row and col for duplicates
     for (uint8_t i = 0; i < N; ++i)
     {
         if (!is_vertical && i == fixed)
@@ -236,24 +138,24 @@ SkyScrappers<N>::fill(Matrix m, std::array<uint8_t, N> line, int idx)
                 return {};
         }
     }
+
     return m;
 }
 
 template<uint8_t N>
-std::vector<typename SkyScrappers<N>::Matrix>
-SkyScrappers<N>::generate(std::array<uint8_t, N*4> clues, int i,
-                          const std::vector<SkyScrappers<N>::Matrix>& templates, size_t max)
+std::vector<typename SkyScrapers<N>::Matrix>
+SkyScrapers<N>::generate(int i, const std::vector<SkyScrapers<N>::Matrix>& templates, size_t max)
 {
-    if (clues[i] == 0)
+    if (clues_[i] == 0)
         return templates;
 
     std::vector<Matrix> rs;
     if (max < std::numeric_limits<size_t>::max())
         rs.reserve(max);
-    uint8_t rclue = clues[ridx(i)];
+    uint8_t rclue = clues_[ridx(i)];
     for (const auto& tpl : templates)
     {
-        for (const auto& line: permutations_[clues[i]])
+        for (const auto& line: permutations_[clues_[i]])
         {
             if (rclue == 0 || line.rev_vision == rclue)
             {
@@ -272,8 +174,8 @@ SkyScrappers<N>::generate(std::array<uint8_t, N*4> clues, int i,
 }
 
 template<uint8_t N>
-typename SkyScrappers<N>::Matrix
-SkyScrappers<N>::fill(SkyScrappers<N>::Matrix matrix, uint8_t n, uint8_t i, uint8_t j)
+typename SkyScrapers<N>::Matrix
+SkyScrapers<N>::fill(SkyScrapers<N>::Matrix matrix, uint8_t n, uint8_t i, uint8_t j)
 {
     if (matrix[i][j] == n)
         return matrix;
@@ -291,8 +193,8 @@ SkyScrappers<N>::fill(SkyScrappers<N>::Matrix matrix, uint8_t n, uint8_t i, uint
 }
 
 template<uint8_t N>
-std::vector<typename SkyScrappers<N>::Matrix>
-SkyScrappers<N>::generate(uint8_t i, uint8_t j, const std::vector<SkyScrappers<N>::Matrix>& templates)
+std::vector<typename SkyScrapers<N>::Matrix>
+SkyScrapers<N>::generate(uint8_t i, uint8_t j, const std::vector<SkyScrapers<N>::Matrix>& templates)
 {
     std::vector<Matrix> rs;
     for (const auto& tpl : templates)
@@ -310,7 +212,7 @@ SkyScrappers<N>::generate(uint8_t i, uint8_t j, const std::vector<SkyScrappers<N
 
 template<uint8_t N>
 int**
-SkyScrappers<N>::Solve(const int* clues)
+SkyScrapers<N>::Solve(const int* clues)
 {
     if (N > 9)
         return nullptr;
@@ -409,7 +311,7 @@ SkyScrappers<N>::Solve(const int* clues)
             if (find(rskip, *cur) != rskip.end())
                 continue;
 
-            auto tmp = generate(clues_, *cur, candidates, min_sz);
+            auto tmp = generate(*cur, candidates, min_sz);
             LOG(INFO) << "   check " << (int)*cur << ": " << tmp.size() << std::endl;
             if (clues_[ridx(*cur)] != 0)
                 rskip.emplace_back(ridx(*cur));
